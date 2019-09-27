@@ -106,7 +106,6 @@ void can_enable(can_data_t *hcan, bool loop_back, bool listen_only, bool one_sho
 	CAN_TypeDef *can = hcan->instance;
 
 	uint32_t mcr = CAN_MCR_INRQ
-				 | CAN_MCR_ABOM
 				 | CAN_MCR_TXFP
 				 | (one_shot ? CAN_MCR_NART : 0);
 
