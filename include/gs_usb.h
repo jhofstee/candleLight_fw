@@ -46,6 +46,7 @@ THE SOFTWARE.
 /* #define GS_CAN_FEATURE_REQ_USB_QUIRK_LPC546XX (1<<9) */
 /* #define GS_CAN_FEATURE_BT_CONST_EXT          (1<<10) */
 #define GS_CAN_MODE_BERR_REPORTING              (1<<11)
+/* #define GS_CAN_FEATURE_GET_STATE             (1<<12) */
 
 #define GS_CAN_FEATURE_LISTEN_ONLY              (1<<0)
 #define GS_CAN_FEATURE_LOOP_BACK                (1<<1)
@@ -66,6 +67,7 @@ THE SOFTWARE.
  */
 #define GS_CAN_FEATURE_BT_CONST_EXT             (1<<10)
 #define GS_CAN_FEATURE_BERR_REPORTING           (1<<11)
+#define GS_CAN_FEATURE_GET_STATE                (1<<12)
 
 #define GS_CAN_FLAG_OVERFLOW                    (1<<0)
 #define GS_CAN_FLAG_FD                          (1<<1) /* is a CAN-FD frame */
@@ -165,6 +167,7 @@ enum gs_usb_breq {
 	GS_USB_BREQ_SET_USER_ID,
 	GS_USB_BREQ_DATA_BITTIMING,
 	GS_USB_BREQ_BT_CONST_EXT,
+	CG_USB_BREQ_STATE,
 };
 
 enum gs_can_mode {

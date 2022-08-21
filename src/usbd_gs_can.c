@@ -273,7 +273,8 @@ static const struct gs_device_bt_const USBD_GS_CAN_btconst = {
 	| GS_CAN_FEATURE_IDENTIFY
 	| GS_CAN_FEATURE_USER_ID
 	| GS_CAN_FEATURE_PAD_PKTS_TO_MAX_PKT_SIZE
-	| GS_CAN_FEATURE_BERR_REPORTING,
+	| GS_CAN_FEATURE_BERR_REPORTING
+	| GS_CAN_FEATURE_GET_STATE,
 	CAN_CLOCK_SPEED, // can timing base clock
 	1, // tseg1 min
 	16, // tseg1 max
@@ -348,6 +349,13 @@ void USBD_GS_CAN_SetChannel(USBD_HandleTypeDef *pdev, uint8_t channel, can_data_
 	assert_basic(channel < NUM_CAN_CHANNEL);
 	hcan->channels[channel] = handle;
 	return;
+}
+
+static can_data_t *USBD_GS_CAN_GetChannel(USBD_HandleTypeDef *pdev, uint8_t channel)
+{
+	USBD_GS_CAN_HandleTypeDef *hcan = (USBD_GS_CAN_HandleTypeDef*) pdev->pClassData;
+
+	return (channel < NUM_CAN_CHANNEL ? hcan->channels[channel] : NULL);
 }
 
 static const led_seq_step_t led_identify_seq[] = {
@@ -508,6 +516,20 @@ static uint8_t USBD_GS_CAN_Config_Request(USBD_HandleTypeDef *pdev, USBD_SetupRe
 			}
 			break;
 
+		case CG_USB_BREQ_STATE:
+		{
+			can_data_t *ch = USBD_GS_CAN_GetChannel(pdev, req->wValue);
+			if (ch && req->wLength >= 3) {
+				uint32_t err = can_get_error_status(ch);
+				struct { uint32_t state; uint32_t rec; uint32_t tec; } msg = {ch->state, can_rec(err), can_tec(err)};
+
+				memcpy(hcan->ep0_buf, &msg, sizeof(msg));
+				USBD_CtlSendData(pdev, (uint8_t *) &msg, sizeof(msg));
+			} else {
+				USBD_CtlError(pdev, req);
+			}
+			break;
+		}
 
 		default:
 			USBD_CtlError(pdev, req);
