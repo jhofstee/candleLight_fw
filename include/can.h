@@ -39,6 +39,7 @@ typedef struct {
 	uint8_t phase_seg1;
 	uint8_t phase_seg2;
 	uint8_t sjw;
+	enum gs_can_state state;
 } can_data_t;
 
 void can_init(can_data_t *hcan, CAN_TypeDef *instance);
@@ -57,10 +58,12 @@ bool can_send(can_data_t *hcan, struct gs_host_frame *frame);
  */
 uint32_t can_get_error_status(can_data_t *hcan);
 
-#define CAN_ERRCOUNT_THRESHOLD 15	/* send an error frame if tx/rx counters increase by more than this amount */
+// note: in bus-off the counters overflow, they keep the values before reaching bus-off
+static inline uint8_t can_tec(uint32_t err) { return (err & CAN_ESR_BOFF ? 0 : err >> 16); }
+static inline uint8_t can_rec(uint32_t err) { return (err & CAN_ESR_BOFF ? 0 : err >> 24); }
 
-/** parse status value returned by can_get_error_status().
- * @param frame : will hold the generated error frame
- * @return 1 when status changes (if any) need a new error frame sent
- */
-bool can_parse_error_status(uint32_t err, uint32_t last_err, can_data_t *hcan, struct gs_host_frame *frame);
+bool can_new_state(can_data_t *hcan, enum gs_can_state *state);
+void can_change_state(can_data_t *hcan, struct gs_host_frame *frame, enum gs_can_state new_state);
+
+bool can_berr_report_pending(can_data_t *hcan);
+void can_report_berr(can_data_t *hcan, struct gs_host_frame *frame);

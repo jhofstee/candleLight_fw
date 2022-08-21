@@ -75,6 +75,7 @@ void can_init(can_data_t *hcan, CAN_TypeDef *instance)
 	hcan->instance   = instance;
 	hcan->brp        = 6;
 	hcan->sjw        = 1;
+	hcan->state      = GS_CAN_STATE_STOPPED;
 #if defined(STM32F0)
 	hcan->phase_seg1 = 13;
 	hcan->phase_seg2 = 2;
@@ -146,6 +147,8 @@ void can_enable(can_data_t *hcan, bool loop_back, bool listen_only, bool one_sho
 	can->FA1R |= filter_bit;         // enable filter
 	can->FMR &= ~CAN_FMR_FINIT;
 
+	hcan->state = GS_CAN_STATE_ERROR_ACTIVE;
+
 #ifdef nCANSTBY_Pin
 	HAL_GPIO_WritePin(nCANSTBY_Port, nCANSTBY_Pin, GPIO_PIN_SET);
 #endif
@@ -158,6 +161,8 @@ void can_disable(can_data_t *hcan)
 	HAL_GPIO_WritePin(nCANSTBY_Port, nCANSTBY_Pin, GPIO_PIN_RESET);
 #endif
 	can->MCR |= CAN_MCR_INRQ ; // send can controller into initialization mode
+
+	hcan->state = GS_CAN_STATE_STOPPED;
 }
 
 bool can_is_enabled(can_data_t *hcan)
@@ -272,18 +277,8 @@ uint32_t can_get_error_status(can_data_t *hcan)
 	return can->ESR;
 }
 
-static bool status_is_active(uint32_t err)
+static void create_error_frame(struct gs_host_frame *frame, uint32_t err)
 {
-	return !(err & (CAN_ESR_BOFF | CAN_ESR_EPVF));
-}
-
-bool can_parse_error_status(uint32_t err, uint32_t last_err, can_data_t *hcan, struct gs_host_frame *frame)
-{
-	/* We build up the detailed error information at the same time as we decide
-	 * whether there's anything worth sending. This variable tracks that final
-	 * result. */
-	bool should_send = false;
-
 	frame->echo_id = 0xFFFFFFFF;
 	frame->can_id  = CAN_ERR_FLAG | CAN_ERR_CRTL;
 	frame->can_dlc = CAN_ERR_DLC;
@@ -293,102 +288,124 @@ bool can_parse_error_status(uint32_t err, uint32_t last_err, can_data_t *hcan, s
 	frame->data[3] = CAN_ERR_PROT_LOC_UNSPEC;
 	frame->data[4] = CAN_ERR_TRX_UNSPEC;
 	frame->data[5] = 0;
-	frame->data[6] = 0;
-	frame->data[7] = 0;
+	frame->data[6] = can_tec(err);
+	frame->data[7] = can_rec(err);
+}
 
-	if (err & CAN_ESR_BOFF) {
-		frame->can_id |= CAN_ERR_BUSOFF;
-		if (!(last_err & CAN_ESR_BOFF)) {
-			/* We transitioned to bus-off. */
-			should_send = true;
-		}
-	} else if (last_err & CAN_ESR_BOFF) {
-		/* We transitioned out of bus-off. */
-		should_send = true;
-	}
+bool can_berr_report_pending(can_data_t *hcan)
+{
+	uint8_t lec;
 
-	/* We transitioned from passive/bus-off to active, so report the edge. */
-	if (!status_is_active(last_err) && status_is_active(err)) {
-		frame->data[1] |= CAN_ERR_CRTL_ACTIVE;
-		should_send = true;
-	}
+	if (!hcan->berr_reporting)
+		return false;
+	lec = (can_get_error_status(hcan) >> 4) & 0x07;
 
-	uint8_t tx_error_cnt = (err>>16) & 0xFF;
-	uint8_t rx_error_cnt = (err>>24) & 0xFF;
-	/* The Linux sja1000 driver puts these counters here. Seems like as good a
-	 * place as any. */
-	frame->data[6] = tx_error_cnt;
-	frame->data[7] = rx_error_cnt;
+	return lec != 0 && lec != 7;
+}
 
-	uint8_t last_tx_error_cnt = (last_err>>16) & 0xFF;
-	uint8_t last_rx_error_cnt = (last_err>>24) & 0xFF;
-	/* If either error counter transitioned to/from 0. */
-	if ((tx_error_cnt == 0) != (last_tx_error_cnt == 0)) {
-		should_send = true;
-	}
-	if ((rx_error_cnt == 0) != (last_rx_error_cnt == 0)) {
-		should_send = true;
-	}
-	/* If either error counter increased by 15. */
-	if (((int)last_tx_error_cnt + CAN_ERRCOUNT_THRESHOLD) < tx_error_cnt) {
-		should_send = true;
-	}
-	if (((int)last_rx_error_cnt + CAN_ERRCOUNT_THRESHOLD) < rx_error_cnt) {
-		should_send = true;
-	}
+static void add_berr_info(can_data_t *hcan, struct gs_host_frame *frame)
+{
+	CAN_TypeDef *can = hcan->instance;
+	uint8_t lec = (can->ESR >> 4) & 0x07;
 
-	if (err & CAN_ESR_EPVF) {
-		frame->data[1] |= CAN_ERR_CRTL_RX_PASSIVE | CAN_ERR_CRTL_TX_PASSIVE;
-		if (!(last_err & CAN_ESR_EPVF)) {
-			should_send = true;
-		}
-	} else if (err & CAN_ESR_EWGF) {
-		frame->data[1] |= CAN_ERR_CRTL_RX_WARNING | CAN_ERR_CRTL_TX_WARNING;
-		if (!(last_err & CAN_ESR_EWGF)) {
-			should_send = true;
-		}
-	} else if (last_err & (CAN_ESR_EPVF | CAN_ESR_EWGF)) {
-		should_send = true;
-	}
-
-	uint8_t lec = (err>>4) & 0x07;
 	switch (lec) {
 		case 0x01: /* stuff error */
 			frame->can_id |= CAN_ERR_PROT;
 			frame->data[2] |= CAN_ERR_PROT_STUFF;
-			should_send = true;
 			break;
 		case 0x02: /* form error */
 			frame->can_id |= CAN_ERR_PROT;
 			frame->data[2] |= CAN_ERR_PROT_FORM;
-			should_send = true;
 			break;
 		case 0x03: /* ack error */
 			frame->can_id |= CAN_ERR_ACK;
-			should_send = true;
 			break;
 		case 0x04: /* bit recessive error */
 			frame->can_id |= CAN_ERR_PROT;
 			frame->data[2] |= CAN_ERR_PROT_BIT1;
-			should_send = true;
 			break;
 		case 0x05: /* bit dominant error */
 			frame->can_id |= CAN_ERR_PROT;
 			frame->data[2] |= CAN_ERR_PROT_BIT0;
-			should_send = true;
 			break;
 		case 0x06: /* CRC error */
 			frame->can_id |= CAN_ERR_PROT;
 			frame->data[3] |= CAN_ERR_PROT_LOC_CRC_SEQ;
-			should_send = true;
 			break;
 		default: /* 0=no error, 7=no change */
 			break;
 	}
 
-	CAN_TypeDef *can = hcan->instance;
-	/* Write 7 to LEC so we know if it gets set to the same thing again */
-	can->ESR = 7<<4;
+	/* Write 7 (software) to LEC to indicate it has been handled */
+	can->ESR |= 7<<4;
+}
 
-	return should_send;
+void can_report_berr(can_data_t *hcan, struct gs_host_frame *frame)
+{
+	create_error_frame(frame, can_get_error_status(hcan));
+	add_berr_info(hcan, frame);
+}
+
+bool can_new_state(can_data_t *hcan, enum gs_can_state *state)
+{
+	uint32_t err = can_get_error_status(hcan);
+
+	// check normal operation state first, to leave early in almost all cases.
+	if ((err & (CAN_ESR_BOFF | CAN_ESR_EPVF | CAN_ESR_EWGF)) == 0 &&
+			hcan->state == GS_CAN_STATE_ERROR_ACTIVE) {
+		return false;
+	}
+
+	// states with cannot change automatically.
+	if (hcan->state >= GS_CAN_STATE_BUS_OFF) {
+		return false;
+	}
+
+	if (err & CAN_ESR_BOFF) {
+		*state = GS_CAN_STATE_BUS_OFF;
+	} else if (err & CAN_ESR_EPVF) {
+		*state = GS_CAN_STATE_ERROR_PASSIVE;
+	} else if (err & CAN_ESR_EWGF) {
+		*state = GS_CAN_STATE_ERROR_WARNING;
+	} else {
+		*state = GS_CAN_STATE_ERROR_ACTIVE;
+	}
+
+	return *state != hcan->state;
+}
+
+void can_change_state(can_data_t *hcan, struct gs_host_frame *frame, enum gs_can_state new_state)
+{
+	uint32_t err = can_get_error_status(hcan);
+	uint8_t tec = can_tec(err);
+	uint8_t rec = can_rec(err);
+
+	create_error_frame(frame, err);
+
+	switch (new_state) {
+		case GS_CAN_STATE_STOPPED:
+		case GS_CAN_STATE_SLEEPING:
+		case GS_CAN_STATE_BUS_OFF:
+			frame->can_id |= CAN_ERR_BUSOFF;
+			break;
+
+		case GS_CAN_STATE_ERROR_PASSIVE:
+			frame->data[1] |= rec >= tec ? CAN_ERR_CRTL_RX_PASSIVE : 0;
+			frame->data[1] |= rec <= tec ? CAN_ERR_CRTL_TX_PASSIVE : 0;
+			break;
+
+		case GS_CAN_STATE_ERROR_WARNING:
+			frame->data[1] |= rec >= tec ? CAN_ERR_CRTL_RX_WARNING : 0;
+			frame->data[1] |= rec <= tec ? CAN_ERR_CRTL_TX_WARNING : 0;
+			break;
+
+		case GS_CAN_STATE_ERROR_ACTIVE:
+			frame->data[1] |= CAN_ERR_CRTL_ACTIVE;
+			break;
+	}
+
+	hcan->state = new_state;
+
+	if (can_berr_report_pending(hcan))
+		add_berr_info(hcan, frame);
 }

@@ -56,10 +56,45 @@ static queue_t *q_frame_pool = NULL;
 static queue_t *q_from_host = NULL;
 static queue_t *q_to_host = NULL;
 
+static void check_state_change(can_data_t *hcan)
+{
+	enum gs_can_state new_state;
+	struct gs_host_frame *frame;
+
+	if (!can_new_state(hcan, &new_state)) {
+		return;
+	}
+
+	frame = queue_pop_front(q_frame_pool);
+	if (!frame) {
+		return;
+	}
+
+	can_change_state(hcan, frame, new_state);
+	frame->timestamp_us = timer_get();
+	send_to_host_or_enqueue(frame);
+}
+
+static void check_berr_report(can_data_t *hcan)
+{
+	struct gs_host_frame *frame;
+
+	if (!can_berr_report_pending(hcan)) {
+		return;
+	}
+
+	frame = queue_pop_front(q_frame_pool);
+	if (!frame) {
+		return;
+	}
+
+	can_report_berr(hcan, frame);
+	frame->timestamp_us = timer_get();
+	send_to_host_or_enqueue(frame);
+}
+
 int main(void)
 {
-	uint32_t last_can_error_status = 0;
-
 	HAL_Init();
 	SystemClock_Config();
 
@@ -147,23 +182,18 @@ int main(void)
 					queue_push_back(q_frame_pool, frame);
 				}
 			}
-			// If there are frames to receive, don't report any error frames. The
-			// best we can localize the errors to is "after the last successfully
-			// received frame", so wait until we get there. LEC will hold some error
-			// to report even if multiple pass by.
-		} else {
-			uint32_t can_err = can_get_error_status(&hCAN);
-			struct gs_host_frame *frame = queue_pop_front(q_frame_pool);
-			if (frame != 0) {
-				frame->timestamp_us = timer_get();
-				if (can_parse_error_status(can_err, last_can_error_status, &hCAN, frame)) {
-					send_to_host_or_enqueue(frame);
-					last_can_error_status = can_err;
-				} else {
-					queue_push_back(q_frame_pool, frame);
-				}
-			}
+
 		}
+
+		// directly report state changes
+		check_state_change(&hCAN);
+
+		// If there are frames to receive, don't report any error frames. The
+		// best we can localize the errors to is "after the last successfully
+		// received frame", so wait until we get there. LEC will hold some error
+		// to report even if multiple pass by.
+		if (!can_is_rx_pending(&hCAN))
+			check_berr_report(&hCAN);
 
 		led_update(&hLED);
 
