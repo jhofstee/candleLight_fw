@@ -272,7 +272,8 @@ static const struct gs_device_bt_const USBD_GS_CAN_btconst = {
 	| GS_CAN_FEATURE_HW_TIMESTAMP
 	| GS_CAN_FEATURE_IDENTIFY
 	| GS_CAN_FEATURE_USER_ID
-	| GS_CAN_FEATURE_PAD_PKTS_TO_MAX_PKT_SIZE,
+	| GS_CAN_FEATURE_PAD_PKTS_TO_MAX_PKT_SIZE
+	| GS_CAN_FEATURE_BERR_REPORTING,
 	CAN_CLOCK_SPEED, // can timing base clock
 	1, // tseg1 min
 	16, // tseg1 max
@@ -409,8 +410,9 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 					can_enable(ch,
 						(mode->flags & GS_CAN_MODE_LOOP_BACK) != 0,
 						(mode->flags & GS_CAN_MODE_LISTEN_ONLY) != 0,
-						(mode->flags & GS_CAN_MODE_ONE_SHOT) != 0
+						(mode->flags & GS_CAN_MODE_ONE_SHOT) != 0,
 						// triple sampling not supported on bxCAN
+						(mode->flags & GS_CAN_MODE_BERR_REPORTING) != 0
 					);
 
 					led_set_mode(hcan->leds, led_mode_normal);

@@ -45,6 +45,7 @@ THE SOFTWARE.
 #define GS_CAN_MODE_FD                          (1<<8) /* switch device to CAN-FD mode */
 /* #define GS_CAN_FEATURE_REQ_USB_QUIRK_LPC546XX (1<<9) */
 /* #define GS_CAN_FEATURE_BT_CONST_EXT          (1<<10) */
+#define GS_CAN_MODE_BERR_REPORTING              (1<<11)
 
 #define GS_CAN_FEATURE_LISTEN_ONLY              (1<<0)
 #define GS_CAN_FEATURE_LOOP_BACK                (1<<1)
@@ -64,6 +65,7 @@ THE SOFTWARE.
  * GS_USB_BREQ_BT_CONST_EXT and struct gs_device_bt_const_extended
  */
 #define GS_CAN_FEATURE_BT_CONST_EXT             (1<<10)
+#define GS_CAN_FEATURE_BERR_REPORTING           (1<<11)
 
 #define GS_CAN_FLAG_OVERFLOW                    (1<<0)
 #define GS_CAN_FLAG_FD                          (1<<1) /* is a CAN-FD frame */

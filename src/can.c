@@ -102,7 +102,7 @@ bool can_set_bittiming(can_data_t *hcan, uint16_t brp, uint8_t phase_seg1, uint8
 	}
 }
 
-void can_enable(can_data_t *hcan, bool loop_back, bool listen_only, bool one_shot)
+void can_enable(can_data_t *hcan, bool loop_back, bool listen_only, bool one_shot, bool berr_reporting)
 {
 	CAN_TypeDef *can = hcan->instance;
 
@@ -117,6 +117,7 @@ void can_enable(can_data_t *hcan, bool loop_back, bool listen_only, bool one_sho
 				 | (loop_back ? CAN_MODE_LOOPBACK : 0)
 				 | (listen_only ? CAN_MODE_SILENT : 0);
 
+	hcan->berr_reporting = berr_reporting;
 
 	// Reset CAN peripheral
 	can->MCR |= CAN_MCR_RESET;
