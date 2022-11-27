@@ -114,4 +114,11 @@
 /* This is if CONFIG_ccc is compiled in(=y) or a module(=m). */
 #define IS_ENABLED(_x) (IS_BUILTIN(_x) || IS_MODULE(_x))
 
+#ifdef static_assert
+#undef static_assert
+#endif
+
+#define static_assert(expr, ...)		__static_assert(expr, ## __VA_ARGS__, #expr)
+#define __static_assert(expr, msg, ...) _Static_assert(expr, msg)
+
 #endif /* _LINUXKPI_LINUX_COMPILER_H_ */
