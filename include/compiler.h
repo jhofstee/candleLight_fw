@@ -121,4 +121,19 @@
 #define static_assert(expr, ...)		__static_assert(expr, ## __VA_ARGS__, #expr)
 #define __static_assert(expr, msg, ...) _Static_assert(expr, msg)
 
+#define _O_CTASSERT(x)					_O__CTASSERT(x, __LINE__)
+#define _O__CTASSERT(x, y)				_O___CTASSERT(x, y)
+#define _O___CTASSERT(x, y)				while (0) { \
+		typedef char __assert_line_ ## y [(x) ? 1 : -1]; \
+		__assert_line_ ## y _x; \
+		_x[0] = '\0'; \
+}
+
+#define BUILD_BUG()						do { CTASSERT(0); } while (0)
+#define BUILD_BUG_ON(x)					do { _O_CTASSERT(!(x)) } while (0)
+#define BUILD_BUG_ON_MSG(x, msg)		BUILD_BUG_ON(x)
+#define BUILD_BUG_ON_NOT_POWER_OF_2(x)	BUILD_BUG_ON(!powerof2(x))
+#define BUILD_BUG_ON_INVALID(expr)		while (0) { (void)(expr); }
+#define BUILD_BUG_ON_ZERO(x)			((int)sizeof(struct { int : -((x) != 0); }))
+
 #endif /* _LINUXKPI_LINUX_COMPILER_H_ */
