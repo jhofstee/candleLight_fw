@@ -57,6 +57,7 @@ THE SOFTWARE.
 
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
+	#define NUM_CAN_CHANNEL			 1
 
 	#define CAN_S_Pin				 GPIO_PIN_13
 	#define CAN_S_GPIO_Port			 GPIOC
@@ -80,6 +81,7 @@ THE SOFTWARE.
 
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
+	#define NUM_CAN_CHANNEL			 1
 
 // SILENT pin not connected
 
@@ -102,6 +104,7 @@ THE SOFTWARE.
 
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
+	#define NUM_CAN_CHANNEL			 1
 
 // SILENT pin not connected
 
@@ -124,6 +127,7 @@ THE SOFTWARE.
 
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
+	#define NUM_CAN_CHANNEL			 1
 
 // SILENT pin not connected
 
@@ -146,6 +150,7 @@ THE SOFTWARE.
 
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
+	#define NUM_CAN_CHANNEL			 1
 
 // SILENT pin not connected
 
@@ -168,6 +173,7 @@ THE SOFTWARE.
 
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
+	#define NUM_CAN_CHANNEL			 1
 
 // SILENT pin not connected
 
@@ -200,6 +206,7 @@ THE SOFTWARE.
 
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
+	#define NUM_CAN_CHANNEL			 1
 
 // SILENT pin not connected
 
@@ -222,6 +229,7 @@ THE SOFTWARE.
 
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
+	#define NUM_CAN_CHANNEL			 1
 
 // SILENT pin not connected
 
@@ -290,6 +298,7 @@ THE SOFTWARE.
 
 	#define CAN_INTERFACE			 CAN1
 	#define CAN_CLOCK_SPEED			 42000000
+	#define NUM_CAN_CHANNEL			 1
 
 	#define CAN_S_Pin				 GPIO_PIN_10
 	#define CAN_S_GPIO_Port			 GPIOA
