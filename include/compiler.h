@@ -127,6 +127,7 @@
 		typedef char __assert_line_ ## y [(x) ? 1 : -1]; \
 		__assert_line_ ## y _x; \
 		_x[0] = '\0'; \
+		(void)_x; \
 }
 
 #define BUILD_BUG()						do { CTASSERT(0); } while (0)
