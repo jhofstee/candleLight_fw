@@ -185,4 +185,16 @@ const struct BoardConfig config = {
 	.phy_power_set = legacy_phy_power_set,
 	.termination_set = legacy_termination_set,
 	.channels[0].interface = CAN_INTERFACE,
+	.channels[0].leds = {
+		[LED_RX] = {
+			.port = LEDRX_GPIO_Port,
+			.pin = LEDRX_Pin,
+			.active_high = LEDRX_Active_High,
+		},
+		[LED_TX] = {
+			.port = LEDTX_GPIO_Port,
+			.pin = LEDTX_Pin,
+			.active_high = LEDTX_Active_High,
+		}
+	},
 };
